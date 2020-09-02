@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <stdio.h>
+#include <string.h>
 
 /* Run current process in background mode (daemon, evil Monkey >:) */
 int utils_set_daemon() {
@@ -49,3 +50,22 @@ int utils_set_daemon() {
 
     return 0;
 }
+
+
+void rtrim(char * pstr,char trim){
+
+    if(pstr == NULL ){
+        return;
+    }
+    size_t len = strlen(pstr);
+
+    for (int i = len; i > 0; --i) {
+        if(*(pstr+i) == trim){
+            *(pstr+i) = 0;
+        }
+    }
+}
+
+
+
+

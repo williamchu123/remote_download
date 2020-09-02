@@ -6,17 +6,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "conc.h"
 
 
 int callSystemCommand(char * downloadUrl,char * fileName){
 
-    char * string = "curl https://codeload.github.com/junit-team/junit5/zip/main -o \"junit.zip\"";
+//    char * string = "curl https://codeload.github.com/junit-team/junit5/zip/main -o \"junit.zip\"";
 
 
     char * curl = (char *)malloc(strlen(downloadUrl)+strlen(fileName) + 12);
 
 
-    sprintf(curl,"curl %s -o %s ",downloadUrl,fileName);
+    sprintf(curl,"curl %s -o %s%s ",downloadUrl,ROOT_DOC,fileName);
 
 #ifdef __DEBUG__
     printf("%s\n",curl);

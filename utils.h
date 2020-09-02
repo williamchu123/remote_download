@@ -9,3 +9,5 @@
 
 
 int utils_set_daemon();
+
+void rtrim(char * pstr,char trim);

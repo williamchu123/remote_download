@@ -8,6 +8,9 @@
 #endif //REMOTE_DOWNLOAD_CONC_H
 
 
+#define BUFFER_SIZE 2048
+#define ROOT_DOC "/var/www/html/"
+
 void * handle(void * arg);
 
 void openConnection(int port);

@@ -15,6 +15,10 @@
 #include <string.h>
 #include <errno.h>
 #include "call.h"
+#include "utils.h"
+
+
+
 
 
 void openConnection(int port) {
@@ -28,6 +32,7 @@ void openConnection(int port) {
     //
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket() error. Failed to initiate a socket");
+        exit(1);
     }
 
 
@@ -40,13 +45,10 @@ void openConnection(int port) {
     server_addr_in.sin_port = htons(port);
     server_addr_in.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    int opt = 1;
-//    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-
 
     if (bind(server_fd, (struct sockaddr *) &server_addr_in, sizeof(server_addr_in)) == -1) {
         perror("bind() failed");
+        exit(1);
     }
 
     printf("the server started...\n");
@@ -56,15 +58,14 @@ void openConnection(int port) {
 
     if (listen(server_fd, 128) == -1) {
         perror("listen failed");
+        exit(1);
     }
 
-
-
-//    struct sockaddr_in client_sock_in;
-
-
-
+    //接受请求，创建新线程去处理
     while (1){
+
+
+
         struct sockaddr_in * pSockAddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
 
         socklen_t socket_id = sizeof(struct sockaddr_in);
@@ -72,7 +73,11 @@ void openConnection(int port) {
         int client_fd = accept(server_fd, (struct sockaddr *) pSockAddr, &socket_id);
 
         if(client_fd == -1){
-            goto close;
+            perror("连接失败");
+
+            free(pSockAddr);
+            close(server_fd);
+            exit(1);
         }
 
 
@@ -84,81 +89,128 @@ void openConnection(int port) {
 
         if(pthread_create(ppthread, NULL, handle, p_client_fd) != 0){
             perror("创建线程失败！！！");
-            goto close;
+
+            free(ppthread);
+            close(client_fd);
         }
-
-
     }
 
-
-    //进行资源的释放
-    close:
-    close(server_fd);
 
 }
 
 
+
+
+/**
+ * 简单通信协议v1.0
+ *
+ *
+ * client       ------->       server
+ *
+ * xxx xxx\n      ----->
+ * success/fail url\n   <------
+ *
+ *
+ * axel -n 20 url
+ *
+ * 过程结束
+ *
+ */
 void *handle(void *arg) {
 
     int client_fd = *((int*)arg);
 
     printf("当前fd:%d",client_fd);
 
-    char buf[1024];
+    char buf[BUFFER_SIZE];
+    char buf2[BUFFER_SIZE];
+
+    char * p_download_url;
+    char * p_file_name;
+
+    char * strp = NULL;
 
     int count = 0;
+    int index = 0;
+
+
     while (1){
-        if((count = read(client_fd,buf,1024)) == -1){
-            goto close;
+
+        //进行初始化
+        memset(buf,0,sizeof(buf));
+        memset(buf2,0,sizeof(buf2));
+
+
+        p_download_url = NULL;
+        p_file_name = NULL;
+        strp = NULL;
+        count = 0;
+        index = 0;
+
+
+        if((count = read(client_fd,buf,BUFFER_SIZE)) == -1){
+
+            close(client_fd);
+            exit(1);
         }
 
 
         buf[count] = '\0';
 
+
+        rtrim(buf,'\n');
+        rtrim(buf,'\r');
+
+
         printf("开始下载%s",buf);
 
-        //https://codeload.github.com/junit-team/junit5/zip/main junit5.zip
+        for (int i = 0; i < count; ++i) {
+            if(buf[i] == ' '){
+                index = i;
+                break;
+            }
+        }
 
-        //
-
-        char * s_buf = (char *)malloc(sizeof(char)*(count+1));
-
-
-        strncpy(s_buf,buf,count);
-
-
-        char * p1  = strsep(&s_buf," ");
-
-        size_t sdl1 = strlen(p1);
-
-        char *download_url =  (char *)malloc(sizeof(char)*(sdl1+1));
+        if(index == 0){
+            perror("输入格式错误");
+            continue;
+        }
 
 
+        strp = buf;
 
-        strcpy(download_url,p1);
-
-
-        char * p2 = strsep(&s_buf,"");
-
-        size_t sdl2 = strlen(p2);
-
-        char *download_file_name =  (char *)malloc(sizeof(char)*(sdl2+1));
-
-        strcpy(download_file_name,p2);
+        p_download_url = strsep(&strp, " ");
+        p_file_name = strp;
 
 
-        printf("\ndownload_url:%s download_file_name:%s\n",download_url,download_file_name);
+        if(p_download_url == NULL || p_file_name == NULL){
+            perror("p_download_url or p_file_name is null");
+            continue;
+        }
 
-        callSystemCommand(download_url,download_file_name);
+
+        printf("\ndownload_url:%s download_file_name:%s\n",p_download_url,p_file_name);
 
 
-        write(client_fd,buf,count);
+        if(callSystemCommand(p_download_url,p_file_name) == 0){
+
+            //success url
+
+            sprintf(buf2,"success http://172.86.70.211/%s",p_file_name);
+
+            write(client_fd,buf2,strlen(buf2));
+
+        }else{
+
+            //fail null
+            sprintf(buf2,"fail null");
+
+            write(client_fd,buf2,strlen(buf2));
+        }
+
+
+
     }
-
-    close:
-    close(client_fd);
-
-    return NULL;
 
 }
 
